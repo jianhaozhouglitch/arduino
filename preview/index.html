@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arduino LCD 文字動畫虛擬模擬器 | ATB507 Interactive Arts & Tech</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Outfit:wght@300;400;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 50% 20%, #1a1e29 0%, #0d1117 100%);
+      --accent-blue: #38bdf8;
+      --accent-cyan: #06b6d4;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --panel-bg: rgba(22, 27, 34, 0.85);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --lcd-bg-blue: #0033aa;
+      --lcd-pixel-blue: #bfe3ff;
+      --lcd-bg-green: #7ca82b;
+      --lcd-pixel-green: #1b3302;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      min-height: 100vh;
+      font-family: 'Outfit', 'Noto Sans TC', sans-serif;
+      color: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2.5rem 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      max-width: 800px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.6rem;
+    }
+
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    /* 主工作區容器 */
+    .workbench {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 2rem;
+      max-width: 1100px;
+      width: 100%;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .workbench {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 模擬器硬件展示卡片 */
+    .hardware-card {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 1.25rem;
+      padding: 2rem;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .hardware-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .board-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+    }
+
+    .led-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse-led 2s infinite;
+    }
+
+    @keyframes pulse-led {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.9); }
+    }
+
+    /* 1602 LCD 擬真顯示器樣式 */
+    .lcd-module {
+      background: #1e293b;
+      padding: 18px 24px;
+      border-radius: 12px;
+      border: 3px solid #334155;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 10px 25px rgba(0, 0, 0, 0.4);
+      margin-bottom: 2rem;
+      width: 100%;
+      max-width: 580px;
+    }
+
+    .lcd-label {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      color: #64748b;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .lcd-screen-bezel {
+      background: #0f172a;
+      padding: 14px 18px;
+      border-radius: 6px;
+      border: 2px solid #000;
+      box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.9);
+    }
+
+    .lcd-screen {
+      background-color: var(--lcd-bg-blue);
+      color: var(--lcd-pixel-blue);
+      font-family: 'Fira Code', monospace;
+      font-size: 1.55rem;
+      letter-spacing: 0.18em;
+      line-height: 1.5;
+      padding: 12px 14px;
+      border-radius: 4px;
+      box-shadow: 0 0 25px rgba(0, 102, 255, 0.45);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .lcd-screen.green-mode {
+      background-color: var(--lcd-bg-green);
+      color: var(--lcd-pixel-green);
+      box-shadow: 0 0 25px rgba(124, 168, 43, 0.45);
+    }
+
+    .lcd-screen::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.08) 0px,
+        rgba(0, 0, 0, 0.08) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+    }
+
+    .lcd-row {
+      display: block;
+      white-space: pre;
+      height: 2.1rem;
+      font-weight: 700;
+    }
+
+    /* 物理按鈕互動區域 */
+    .button-assembly {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.5rem 2rem;
+      width: 100%;
+    }
+
+    .button-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .push-button-v3 {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ef4444 0%, #b91c1c 70%, #7f1d1d 100%);
+      border: 6px solid #1e293b;
+      box-shadow: 0 10px 0 #450a0a, 0 15px 25px rgba(239, 68, 68, 0.4);
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.08s ease;
+      outline: none;
+    }
+
+    .push-button-v3:hover {
+      box-shadow: 0 10px 0 #450a0a, 0 18px 30px rgba(239, 68, 68, 0.6);
+      transform: translateY(-2px);
+    }
+
+    .push-button-v3:active, .push-button-v3.pressed {
+      transform: translateY(8px);
+      box-shadow: 0 2px 0 #450a0a, 0 5px 12px rgba(239, 68, 68, 0.5);
+    }
+
+    .push-button-cap {
+      width: 75px;
+      height: 75px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 45% 40%, rgba(255,255,255,0.4) 0%, transparent 60%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.9rem;
+      letter-spacing: 0.05em;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .button-tips {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .button-tips span.kbd {
+      background: #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #f8fafc;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+    }
+
+    /* 側邊控制與模式選擇欄位 */
+    .control-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .sidebar-card {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.25rem 1.5rem;
+    }
+
+    .sidebar-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f8fafc;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .mode-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .mode-btn {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      color: #cbd5e1;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+    }
+
+    .mode-btn:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: #fff;
+    }
+
+    .mode-btn.active {
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.25) 0%, rgba(6, 182, 212, 0.15) 100%);
+      border-color: var(--accent-blue);
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    .mode-btn .mode-num {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.75rem;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* 設置開關組件 */
+    .setting-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .setting-item:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-pill {
+      background: #334155;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: #e2e8f0;
+      transition: 0.2s;
+      user-select: none;
+    }
+
+    .toggle-pill:hover {
+      background: #475569;
+    }
+
+    /* 說明區塊 */
+    .docs-section {
+      max-width: 1100px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 800px) {
+      .docs-section {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .docs-card {
+      background: rgba(22, 27, 34, 0.7);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.5rem;
+    }
+
+    .docs-card h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .docs-card p, .docs-card li {
+      font-size: 0.88rem;
+      color: #94a3b8;
+      line-height: 1.6;
+    }
+
+    .docs-card ul {
+      list-style-type: disc;
+      padding-left: 1.25rem;
+    }
+
+    .docs-card li {
+      margin-bottom: 0.35rem;
+    }
+
+    code {
+      font-family: 'Fira Code', monospace;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.1);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.82rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="badge">ATB507 Interactive Arts & Technology</div>
+    <h1>Arduino LCD 文字動畫互動系統</h1>
+    <p class="subtitle">
+      基於 Arduino Uno R3、1602 LCD 與 Digital Push Button v3 的全動態文字動畫模擬器。<br>
+      支援 6 種文字動畫模式，非阻塞 millis() 即時響應，可點擊下方按鈕實時測試！
+    </p>
+  </header>
+
+  <div class="workbench">
+    <!-- 左側：LCD 屏幕與物理按鈕展示 -->
+    <div class="hardware-card">
+      <div class="hardware-header">
+        <div class="board-indicator">
+          <span class="led-dot"></span>
+          <span>ARDUINO UNO R3 &bull; COM3 CONNECTED</span>
+        </div>
+        <div style="font-size: 0.8rem; color: #64748b; font-family: 'Fira Code', monospace;">
+          I2C: 0x27 | PIN 2
+        </div>
+      </div>
+
+      <!-- 1602 擬真 LCD 螢幕 -->
+      <div class="lcd-module">
+        <div class="lcd-label">
+          <span>HD44780 COMPATIBLE 1602 LCD</span>
+          <span id="speed-label">SPEED: 1X (NORMAL)</span>
+        </div>
+        <div class="lcd-screen-bezel">
+          <div class="lcd-screen" id="lcd-screen">
+            <div class="lcd-row" id="row-0">                </div>
+            <div class="lcd-row" id="row-1">                </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Digital Push Button v3 實體模組 -->
+      <div class="button-assembly">
+        <div class="button-title">
+          <span>🔘 DFRobot Digital Push Button v3</span>
+        </div>
+        
+        <button class="push-button-v3" id="hw-button" title="點擊按鈕切換動畫模式！長按切換2倍速！">
+          <div class="push-button-cap">PUSH</div>
+        </button>
+
+        <div class="button-tips">
+          👉 <strong>短按</strong>：切換下一種動畫模式（循環 0 ~ 5）<br>
+          ⚡ <strong>長按</strong>（按住 > 1秒）：切換 <span class="kbd">1X正常 / 2X加速</span> 播放！
+        </div>
+      </div>
+    </div>
+
+    <!-- 右側：模式列表與即時控制 -->
+    <div class="control-sidebar">
+      <div class="sidebar-card">
+        <div class="sidebar-title">
+          <span>🎭 動畫模式選單</span>
+        </div>
+        <div class="mode-list">
+          <button class="mode-btn active" onclick="selectMode(0)">
+            <span>開機儀式與互動引導</span>
+            <span class="mode-num">M0</span>
+          </button>
+          <button class="mode-btn" onclick="selectMode(1)">
+            <span>黑客矩陣解碼特效</span>
+            <span class="mode-num">M1</span>
+          </button>
+          <button class="mode-btn" onclick="selectMode(2)">
+            <span>雙向奔流走馬燈</span>
+            <span class="mode-num">M2</span>
+          </button>
+          <button class="mode-btn" onclick="selectMode(3)">
+            <span>打字機敘事動畫</span>
+            <span class="mode-num">M3</span>
+          </button>
+          <button class="mode-btn" onclick="selectMode(4)">
+            <span>像素心跳與音波頻譜</span>
+            <span class="mode-num">M4</span>
+          </button>
+          <button class="mode-btn" onclick="selectMode(5)">
+            <span>彈跳碰撞文字 (Ping-Pong)</span>
+            <span class="mode-num">M5</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-card">
+        <div class="sidebar-title">
+          <span>⚙️ 模擬器設置</span>
+        </div>
+        <div class="setting-item">
+          <span>LCD 背光色調</span>
+          <span class="toggle-pill" id="toggle-color-btn" onclick="toggleScreenColor()">經典藍底白字</span>
+        </div>
+        <div class="setting-item">
+          <span>動畫運算速度</span>
+          <span class="toggle-pill" id="toggle-speed-btn" onclick="toggleSpeed()">1X 標準速度</span>
+        </div>
+        <div class="setting-item">
+          <span>模擬按鈕防抖時間</span>
+          <span style="font-family: 'Fira Code', monospace; color: #38bdf8;">40 ms</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部：硬體線路與作品概念說明 -->
+  <div class="docs-section">
+    <div class="docs-card">
+      <h3>🔌 實體硬體接線說明 (Pinout)</h3>
+      <ul>
+        <li><strong>I2C 1602 LCD</strong>:
+          <br><code>GND</code> ➔ Arduino <code>GND</code>
+          <br><code>VCC</code> ➔ Arduino <code>5V</code>
+          <br><code>SDA</code> ➔ Arduino <code>A4</code> (或板端專用SDA腳位)
+          <br><code>SCL</code> ➔ Arduino <code>A5</code> (或板端專用SCL腳位)
+        </li>
+        <li style="margin-top: 0.5rem;"><strong>Digital Push Button v3</strong>:
+          <br><code>D / OUT</code> (綠線/黃線) ➔ Arduino <code>Digital Pin 2</code>
+          <br><code>+ / VCC</code> (紅線) ➔ Arduino <code>5V</code>
+          <br><code>- / GND</code> (黑線) ➔ Arduino <code>GND</code>
+        </li>
+      </ul>
+    </div>
+
+    <div class="docs-card">
+      <h3>💡 程式設計與互動藝術特色</h3>
+      <ul>
+        <li><strong>非阻塞式架構</strong>：全程式使用 <code>millis()</code> 狀態機，完全捨棄 <code>delay()</code>，保證按鈕隨時點擊都能毫秒級響應。</li>
+        <li><strong>8組自訂 5x8 像素</strong>：透過 <code>lcd.createChar()</code> 刻畫出心跳律動與 4 階音頻等化器動態頻譜。</li>
+        <li><strong>藝術敘事結合</strong>：黑客解碼、打字機對話、雙向文字流，完美切合 ATB507 互動科技與創意編程主題！</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // 自訂字元模擬符號映射
+    const GLYPH_HEART_BIG = '♥';
+    const GLYPH_HEART_SMALL = '♡';
+    const GLYPH_NOTE = '♪';
+    const GLYPH_BAR1 = ' ';
+    const GLYPH_BAR2 = '▃';
+    const GLYPH_BAR3 = '▅';
+    const GLYPH_BAR4 = '█';
+    const GLYPH_BLOCK = '■';
+
+    // 狀態
+    let currentMode = 0;
+    let isFastSpeed = false;
+    let animStep = 0;
+    let subStep = 0;
+    let lastAnimUpdate = 0;
+    let isGreenMode = false;
+
+    // DOM 元素
+    const row0El = document.getElementById('row-0');
+    const row1El = document.getElementById('row-1');
+    const hwButton = document.getElementById('hw-button');
+    const lcdScreen = document.getElementById('lcd-screen');
+    const speedLabel = document.getElementById('speed-label');
+    const toggleSpeedBtn = document.getElementById('toggle-speed-btn');
+    const toggleColorBtn = document.getElementById('toggle-color-btn');
+    const modeButtons = document.querySelectorAll('.mode-btn');
+
+    // 格式化為16字元
+    function format16(str) {
+      if (!str) str = '';
+      if (str.length > 16) return str.substring(0, 16);
+      return str.padEnd(16, ' ');
+    }
+
+    function setLCD(line0, line1) {
+      row0El.textContent = format16(line0);
+      row1El.textContent = format16(line1);
+    }
+
+    // 模式切換
+    function selectMode(modeIndex) {
+      currentMode = modeIndex;
+      animStep = 0;
+      subStep = 0;
+      lastAnimUpdate = performance.now();
+
+      modeButtons.forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === modeIndex);
+      });
+
+      // 短暫顯示過渡
+      const modeNames = [
+        "MODE 0: WELCOME",
+        "MODE 1: DECRYPT",
+        "MODE 2: MARQUEE",
+        "MODE 3: TYPEWRITE",
+        "MODE 4: PIXELBEAT",
+        "MODE 5: BOUNCE"
+      ];
+      setLCD(">> SELECT MODE <<", modeNames[modeIndex]);
+      setTimeout(() => {
+        // 進入動畫
+      }, 300);
+    }
+
+    // 按鈕點擊與長按邏輯
+    let buttonPressStart = 0;
+    let longPressHandled = false;
+
+    hwButton.addEventListener('mousedown', () => {
+      hwButton.classList.add('pressed');
+      buttonPressStart = Date.now();
+      longPressHandled = false;
+    });
+
+    hwButton.addEventListener('mouseup', () => {
+      hwButton.classList.remove('pressed');
+      const duration = Date.now() - buttonPressStart;
+      if (duration >= 1000) {
+        // 長按切換速度
+        toggleSpeed();
+      } else {
+        // 短按切換模式
+        let next = (currentMode + 1) % 6;
+        selectMode(next);
+      }
+    });
+
+    hwButton.addEventListener('mouseleave', () => {
+      hwButton.classList.remove('pressed');
+    });
+
+    function toggleSpeed() {
+      isFastSpeed = !isFastSpeed;
+      speedLabel.textContent = isFastSpeed ? "SPEED: 2X (FAST) >>" : "SPEED: 1X (NORMAL)";
+      toggleSpeedBtn.textContent = isFastSpeed ? "2X 加速模式" : "1X 標準速度";
+      
+      setLCD(">> SPEED TOGGLE", isFastSpeed ? "MODE: 2X FAST >>" : "MODE: 1X NORMAL");
+      setTimeout(() => {
+        selectMode(currentMode);
+      }, 500);
+    }
+
+    function toggleScreenColor() {
+      isGreenMode = !isGreenMode;
+      lcdScreen.classList.toggle('green-mode', isGreenMode);
+      toggleColorBtn.textContent = isGreenMode ? "復古黃綠黑字" : "經典藍底白字";
+    }
+
+    // 動畫數據
+    const WELCOME_TITLE = " ATB507 ARDUINO ";
+    const DECRYPT_LINE1 = "INTERACTIVE ART";
+    const DECRYPT_LINE2 = "CREATIVE CODE OK";
+    const MARQUEE_LINE1 = "ATB507 INTERACTIVE ARTS AND TECHNOLOGY * ARDUINO UNO V3 * ";
+    const MARQUEE_LINE2 = "DIGITAL PUSH BUTTON V3 * 1602 LCD ANIMATION SHOWCASE * ";
+    const TYPE_1 = "Hello, ATB507!";
+    const TYPE_2 = "Code is Art :)";
+
+    let bounceX = 0;
+    let bounceDir = 1;
+    let bounceRow = 0;
+
+    // 動畫主循環 (模仿 Arduino loop())
+    function animationLoop(timestamp) {
+      let interval = 200;
+      
+      switch (currentMode) {
+        case 0: // Welcome
+          interval = isFastSpeed ? 250 : 500;
+          if (timestamp - lastAnimUpdate > interval) {
+            lastAnimUpdate = timestamp;
+            const icon = (animStep % 2 === 0) ? GLYPH_HEART_BIG : GLYPH_HEART_SMALL;
+            const sub = (animStep % 2 === 0) ? `${icon} PRESS BUTTON ${icon}` : `${icon} >>>> PUSH <<<< ${icon}`;
+            setLCD(WELCOME_TITLE, sub);
+            animStep++;
+          }
+          break;
+
+        case 1: // Decrypt
+          interval = isFastSpeed ? 40 : 80;
+          if (timestamp - lastAnimUpdate > interval) {
+            lastAnimUpdate = timestamp;
+            const charset = "0123456789ABCDEF$#@%&*!~";
+            let l1 = "";
+            let l2 = "";
+
+            for (let i = 0; i < 16; i++) {
+              if (i < DECRYPT_LINE1.length) {
+                if (i < animStep) l1 += DECRYPT_LINE1[i];
+                else if (i === animStep) l1 += GLYPH_BLOCK;
+                else l1 += charset[Math.floor(Math.random() * charset.length)];
+              } else l1 += " ";
+            }
+
+            for (let i = 0; i < 16; i++) {
+              if (i < DECRYPT_LINE2.length) {
+                if (animStep >= DECRYPT_LINE1.length && i < (animStep - DECRYPT_LINE1.length)) {
+                  l2 += DECRYPT_LINE2[i];
+                } else if (animStep >= DECRYPT_LINE1.length && i === (animStep - DECRYPT_LINE1.length)) {
+                  l2 += GLYPH_BLOCK;
+                } else {
+                  l2 += charset[Math.floor(Math.random() * charset.length)];
+                }
+              } else l2 += " ";
+            }
+
+            setLCD(l1, l2);
+            subStep++;
+            if (subStep % 2 === 0) animStep++;
+            if (animStep > DECRYPT_LINE1.length + DECRYPT_LINE2.length + 8) {
+              animStep = 0;
+              subStep = 0;
+            }
+          }
+          break;
+
+        case 2: // Marquee
+          interval = isFastSpeed ? 160 : 300;
+          if (timestamp - lastAnimUpdate > interval) {
+            lastAnimUpdate = timestamp;
+            let l1 = "";
+            let l2 = "";
+            for (let i = 0; i < 16; i++) {
+              l1 += MARQUEE_LINE1[(animStep + i) % MARQUEE_LINE1.length];
+            }
+            for (let i = 0; i < 16; i++) {
+              let idx = (MARQUEE_LINE2.length * 50 - animStep + i) % MARQUEE_LINE2.length;
+              l2 += MARQUEE_LINE2[idx];
+            }
+            setLCD(l1, l2);
+            animStep++;
+          }
+          break;
+
+        case 3: // Typewriter
+          interval = isFastSpeed ? 80 : 160;
+          if (timestamp - lastAnimUpdate > interval) {
+            lastAnimUpdate = timestamp;
+            if (subStep === 0) {
+              let text = TYPE_1.substring(0, animStep);
+              if (animStep < TYPE_1.length) text += "_";
+              setLCD(text, "");
+              animStep++;
+              if (animStep > TYPE_1.length) {
+                subStep = 1;
+                animStep = 0;
+              }
+            } else if (subStep === 1) {
+              let text2 = TYPE_2.substring(0, animStep);
+              if (animStep < TYPE_2.length) text2 += "_";
+              setLCD(TYPE_1, text2);
+              animStep++;
+              if (animStep > TYPE_2.length) {
+                subStep = 2;
+                animStep = 0;
+              }
+            } else if (subStep === 2) {
+              const cur = (animStep % 2 === 0) ? "_" : " ";
+              setLCD(TYPE_1, TYPE_2 + cur);
+              animStep++;
+              if (animStep > 12) {
+                subStep = 0;
+                animStep = 0;
+              }
+            }
+          }
+          break;
+
+        case 4: // Pixel Visualizer
+          interval = isFastSpeed ? 100 : 200;
+          if (timestamp - lastAnimUpdate > interval) {
+            lastAnimUpdate = timestamp;
+            const icon = (animStep % 2 === 0) ? GLYPH_HEART_BIG : GLYPH_HEART_SMALL;
+            const l1 = `${icon} TECH PULSE ${icon} ${animStep % 2 === 0 ? GLYPH_NOTE : ' '}`;
+            
+            const bars = [GLYPH_BAR1, GLYPH_BAR2, GLYPH_BAR3, GLYPH_BAR4];
+            let l2 = "";
+            for (let col = 0; col < 16; col++) {
+              let val = Math.floor(2.0 + 1.8 * Math.sin(animStep * 0.4 + col * 0.6)) + (Math.random() > 0.5 ? 1 : 0);
+              val = Math.max(0, Math.min(3, val));
+              l2 += bars[val];
+            }
+            setLCD(l1, l2);
+            animStep++;
+          }
+          break;
+
+        case 5: // Bounce
+          interval = isFastSpeed ? 90 : 180;
+          if (timestamp - lastAnimUpdate > interval) {
+            lastAnimUpdate = timestamp;
+            const word = "<ATB507>";
+            const maxPos = 16 - word.length;
+            bounceX += bounceDir;
+            if (bounceX >= maxPos) {
+              bounceX = maxPos;
+              bounceDir = -1;
+              bounceRow = 1 - bounceRow;
+            } else if (bounceX <= 0) {
+              bounceX = 0;
+              bounceDir = 1;
+              bounceRow = 1 - bounceRow;
+            }
+
+            let displayLine = " ".repeat(bounceX) + word + " ".repeat(16 - bounceX - word.length);
+            if (bounceRow === 0) {
+              setLCD(displayLine, "BOUNCE ANIMATION");
+            } else {
+              setLCD("BOUNCE ANIMATION", displayLine);
+            }
+          }
+          break;
+      }
+
+      requestAnimationFrame(animationLoop);
+    }
+
+    // 啟動模擬器
+    selectMode(0);
+    requestAnimationFrame(animationLoop);
+  </script>
+</body>
+</html>
